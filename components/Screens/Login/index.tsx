@@ -1,5 +1,7 @@
+import api from '@/config/api/api';
 import { Colors } from '@/constants/theme';
 import { RootStackParamList } from '@/types/Navigator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Formik } from 'formik';
@@ -13,17 +15,34 @@ const Login = () => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const navigation = useNavigation<HomeScreenNavigationProp>();
-  
+
   const loginSchema = Yup.object().shape({
     email: Yup.string().email('Email inválido').required('Email é obrigatório'),
-    password: Yup.string().min(6, 'Senha deve ter no mínimo 6 caracteres').required('Senha é obrigatória'),
+    senha: Yup.string().min(6, 'Senha deve ter no mínimo 6 caracteres').required('Senha é obrigatória'),
   });
+  const login = async (values: { email: string; senha: string }) => {
+    try {
+      const response = await api.post('/login', values);
+      await AsyncStorage.setItem(
+        'token',
+        JSON.stringify(response.data.token)
+      );
+
+      navigation.navigate('HomeScreen');
+    } catch (error) {
+      console.log(error);
+    }
+
+
+  }
 
   return (
-    <Formik 
-      initialValues={{ email: '', password: '' }}
+    <Formik
+      initialValues={{ email: '', senha: '' }}
       validationSchema={loginSchema}
-      onSubmit={()=>navigation.navigate("HomeScreen")}
+      onSubmit={async (values, { setSubmitting }) => {
+        await login(values).finally(() => setSubmitting(false));
+      }}
     >
       {({ handleChange, handleSubmit, values, errors, touched, isSubmitting }) => (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -32,9 +51,9 @@ const Login = () => {
             <Text style={[styles.subtitle, { color: colors.icon }]}>Faça login para continuar</Text>
           </View>
 
-       
+
           <View style={styles.formContainer}>
-       
+
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>Email</Text>
               <TextInput
@@ -59,19 +78,16 @@ const Login = () => {
               )}
             </View>
 
-            
+
             <View style={styles.inputGroup}>
               <View style={styles.labelContainer}>
                 <Text style={[styles.label, { color: colors.text }]}>Senha</Text>
-                <TouchableOpacity>
-                  <Text style={[styles.forgotLink, { color: colors.tint }]}>Esqueceu?</Text>
-                </TouchableOpacity>
               </View>
               <TextInput
                 style={[
                   styles.input,
                   {
-                    borderColor: touched.password && errors.password ? '#ef4444' : colors.tint,
+                    borderColor: touched.senha && errors.senha ? '#ef4444' : colors.tint,
                     backgroundColor: colorScheme === 'dark' ? '#1f2937' : '#f3f4f6',
                     color: colors.text,
                   }
@@ -79,17 +95,17 @@ const Login = () => {
                 placeholder="••••••••"
                 placeholderTextColor={colors.icon}
                 secureTextEntry
-                value={values.password}
-                onChangeText={handleChange('password')}
+                value={values.senha}
+                onChangeText={handleChange('senha')}
                 editable={!isSubmitting}
               />
-              {touched.password && errors.password && (
-                <Text style={styles.errorText}>{errors.password}</Text>
+              {touched.senha && errors.senha && (
+                <Text style={styles.errorText}>{errors.senha}</Text>
               )}
             </View>
           </View>
 
-        
+
           <TouchableOpacity
             style={[styles.submitButton, { backgroundColor: colors.tint }]}
             onPress={() => handleSubmit()}
@@ -101,7 +117,7 @@ const Login = () => {
             </Text>
           </TouchableOpacity>
 
-      
+
           <View style={styles.signUpContainer}>
             <Text style={[styles.signUpText, { color: colors.icon }]}>
               Não tem conta estudante?{' '}

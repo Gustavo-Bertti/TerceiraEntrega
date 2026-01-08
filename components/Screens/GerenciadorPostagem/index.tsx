@@ -1,11 +1,14 @@
+import api from "@/config/api/api";
+import useUserPermissions from "@/config/auth/userPermissions";
 import { Colors } from "@/constants/theme";
 import { RootStackParamList } from "@/types/Navigator";
 import { Postagem } from "@/types/Postagem";
-import TipoUsuario from "@/types/TipoUsuario";
-import Usuario from "@/types/Usuario";
+import Token from "@/types/Token";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from "react-native";
 type PostagemNavigationProp = NativeStackNavigationProp<
     RootStackParamList,
     'ControllerPostagem'
@@ -15,13 +18,55 @@ const GerenciadorPostagem = () => {
     const colorScheme = useColorScheme();
     const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
-    const tipo: TipoUsuario = { id: 2, nome: "Estudante" };
-    const usuario: Usuario = { id: "1", nome: "João Silva", email: "teste@gmail.com", idTipo: tipo };
-    const postagens: Postagem[] = [
-        { id: "1", titulo: "Postagem 1", conteudo: "Conteúdo da postagem 1", ativo: true, dataCriacao: "2023-01-01", usuario: usuario, idUsuario: "1" },
-        { id: "2", titulo: "Postagem 2", conteudo: "Conteúdo da postagem 2", ativo: true, dataCriacao: "2023-01-02", usuario: usuario, idUsuario: "1" },
-        { id: "3", titulo: "Postagem 3", conteudo: "Conteúdo da postagem 3", ativo: false, dataCriacao: "2023-01-03", usuario: usuario, idUsuario: "1" }
-    ];
+    const [postagens, setPostagens] = useState<Postagem[]>([]);
+    const { checkPermissions } = useUserPermissions();
+    const getToken = async () => await checkPermissions();
+    const [token, setToken] = useState<Token | null>(null);
+    getToken().then(t => setToken(t ? t : null));
+
+    const getPostagens = async () => {
+        try{
+        const response = await api.get<Postagem[]>('/postagem/usuario/' + token?.idUsuario)
+        if (response.data)setPostagens(response.data);
+        }catch(error){
+            setPostagens([]);
+        }
+
+    }
+    const deletePostagem = async (idPostagem: string) => {
+        try{
+            await api.delete('postagem/' + idPostagem)
+            await getPostagens();
+            return true;
+        }catch(error){
+            return false;
+        }
+    }
+
+    const confirmDelete = (idPostagem: string, titulo?: string) => {
+        Alert.alert(
+            'Confirmar exclusão',
+            `Você tem certeza que deseja excluir "${titulo ?? ''}"?`,
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Excluir', style: 'destructive', onPress: async () => {
+                    const ok = await deletePostagem(idPostagem);
+                    if (ok) {
+                        Alert.alert('Excluído', 'Postagem excluída com sucesso');
+                    } else {
+                        Alert.alert('Erro', 'Falha ao excluir a postagem');
+                    }
+                } },
+            ],
+            { cancelable: true }
+        );
+    }
+
+    useFocusEffect(
+        useCallback(() => {
+            getPostagens();
+        }, [])
+    );
 
     const formatDate = (date?: string) => {
         if (!date) return '';
@@ -50,8 +95,8 @@ const GerenciadorPostagem = () => {
                             <TouchableOpacity style={[styles.actionBtn, { borderColor: colors.tint }]} onPress={() => navigation.navigate('ControllerPostagem', { postagem })}>
                                 <Text style={[styles.actionText, { color: colors.tint }]}>Editar</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.deleteBtn]}>
-                                <Text style={styles.deleteText}>Excluir</Text>
+                            <TouchableOpacity onPress={() => confirmDelete(postagem.id, postagem.titulo)} style={[styles.deleteBtn, { borderColor: '#fca5a5', backgroundColor: colorScheme === 'dark' ? '#2b0b0b' : '#fff6f6' }]}>
+                                <Text style={[styles.deleteText, { color: '#b91c1c' }]}>Excluir</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

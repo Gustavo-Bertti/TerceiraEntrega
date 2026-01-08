@@ -40,7 +40,7 @@ const PostagemComponent = ({ postagem }: { postagem: Postagem }) => {
                             {postagem.usuario.nome}
                         </Text>
                         <Text style={[styles.userType, { color: colors.icon }]}>
-                            {postagem.usuario.idTipo.nome}
+                            Professor
                         </Text>
                     </View>
                 </View>

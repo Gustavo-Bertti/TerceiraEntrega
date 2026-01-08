@@ -1,22 +1,44 @@
 import PostagemComponent from "@/components/Postagem";
+import api from "@/config/api/api";
 import { Colors } from "@/constants/theme";
 import { Postagem } from "@/types/Postagem";
-import TipoUsuario from "@/types/TipoUsuario";
-import Usuario from "@/types/Usuario";
-import { useState } from "react";
-
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, useColorScheme, View } from "react-native";
 
 const Home = () => {
     const colorScheme = useColorScheme();
     const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
     
-    const tipo : TipoUsuario = {id: 2, nome: "Estudante"};
-    const usuario : Usuario = {id: "1", nome: "João Silva", email: "teste@gmail.com", idTipo: tipo};
-    const postagens : Postagem[] = [{id: "1", titulo: "Postagem 1", conteudo: "Conteúdo da postagem 1", ativo: true, dataCriacao: "2023-01-01",usuario: usuario, idUsuario: "1"}, {id: "2", titulo: "Postagem 2", conteudo: "Conteúdo da postagem 2", ativo: true, dataCriacao: "2023-01-02",usuario: usuario, idUsuario: "1"}, {id: "3", titulo: "Postagem 3", conteudo: "Conteúdo da postagem 3", ativo: false, dataCriacao: "2023-01-03",usuario: usuario, idUsuario: "1"}];
+   
 
     const [query, setQuery] = useState('');
+    const [postagens, setPostagens] = useState<Postagem[]>([]);
 
+     const getPostagens = async () => {
+        const response = await api.get<Postagem[]>('/postagem')
+        if (response.data)setPostagens(response.data);
+
+    }
+
+    const handlerSearch = (text: string) => {
+      if(text !== ''){
+      api.get<Postagem[]>(`postagem/search?termo=${text}`)
+        .then(response => {
+          setPostagens(response.data);
+        })
+      }
+      else{
+        getPostagens();
+      }
+       
+    }
+
+     useFocusEffect(
+            useCallback(() => {
+                getPostagens();
+            }, [])
+        );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -38,7 +60,10 @@ const Home = () => {
             placeholder="Pesquise um post"
             placeholderTextColor={colors.icon}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={(text) => {
+              setQuery(text);
+              handlerSearch(text);
+            }}
             returnKeyType="search"
             clearButtonMode="while-editing"
           />

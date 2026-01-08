@@ -1,10 +1,13 @@
+import api from '@/config/api/api';
+import useUserPermissions from '@/config/auth/userPermissions';
 import { Colors } from '@/constants/theme';
 import { RootStackParamList } from '@/types/Navigator';
+import Token from '@/types/Token';
 import { RouteProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Formik } from "formik";
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, useColorScheme, View } from "react-native";
 import * as Yup from 'yup';
 
 const postagemSchema = Yup.object().shape({
@@ -17,7 +20,7 @@ type PostagemNavigationProp = NativeStackNavigationProp<
 >;
 type PostagemRouteProp = RouteProp<RootStackParamList, 'ControllerPostagem'>;
 type Props = {
-  route: PostagemRouteProp;
+    route: PostagemRouteProp;
 };
 const ControllerPostagem = ({ route }: Props) => {
     const { postagem } = route.params || {};
@@ -25,8 +28,36 @@ const ControllerPostagem = ({ route }: Props) => {
     const colorScheme = useColorScheme();
     const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
     const isEditing = Boolean(postagem);
-    console.log('postagem:', postagem);
+    const { checkPermissions } = useUserPermissions();
+    const [token, setToken] = useState<Token>();
+    useEffect(() => {
+        const fetchToken = async () => {
+            const t = await checkPermissions();
+            setToken(t);
+        };
 
+        fetchToken();
+    }, []);
+
+    const createPostagem = async (values: { titulo: string, conteudo: string }) => {
+        await api.post('postagem', {titulo: values.titulo, conteudo: values.conteudo, idUsuario: token?.idUsuario}).then(response => {
+            Alert.alert('Postagem criada com sucesso');
+            navigation.goBack();
+        })
+            .catch(error => {
+                Alert.alert('Erro ao criar postagens:', error);
+            });;
+
+    }
+    const putPostagem = async (values: { titulo: string, conteudo: string, ativo: boolean }) => {
+        await api.put('postagem/' + postagem?.id, values).then(response => {
+            Alert.alert('Postagem atualizada com sucesso');
+            navigation.goBack();
+        })
+            .catch(error => {
+                Alert.alert('Erro ao atualizar postagem:', error);
+            });;
+    }
     return (
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer}>
             <View style={styles.header}>
@@ -35,14 +66,21 @@ const ControllerPostagem = ({ route }: Props) => {
             </View>
 
             <Formik
-                initialValues={{ titulo: postagem?.titulo ?? '', conteudo: postagem?.conteudo ?? '' }}
+                initialValues={{ titulo: postagem?.titulo ?? '', conteudo: postagem?.conteudo ?? '', ativo: postagem?.ativo ?? true }}
                 validationSchema={postagemSchema}
-                onSubmit={(values, { setSubmitting }) => {
-                    console.log('submit postagem', values);
-                    setSubmitting(false);
+                onSubmit={async (values, { setSubmitting }) => {
+                    try {
+                        if (isEditing) {
+                            await putPostagem(values);
+                        } else {
+                            await createPostagem(values);
+                        }
+                    } finally {
+                        setSubmitting(false);
+                    }
                 }}
             >
-                {({ handleChange, handleSubmit, values, errors, touched, isSubmitting }) => (
+                {({ handleChange, handleSubmit, values, errors, touched, isSubmitting, setFieldValue }) => (
                     <View style={styles.form}>
                         <Text style={[styles.label, { color: colors.text }]}>Título</Text>
                         <TextInput
@@ -67,6 +105,22 @@ const ControllerPostagem = ({ route }: Props) => {
                             editable={!isSubmitting}
                         />
                         {touched.conteudo && errors.conteudo && <Text style={styles.errorText}>{errors.conteudo}</Text>}
+                        {isEditing && (<>
+                        <View style={styles.switchRow}>
+                            <Text style={[styles.label, { color: colors.text }]}>Ativo</Text>
+                            <Switch
+                                value={!!values.ativo}
+                                onValueChange={(val: boolean) => {
+                                    setFieldValue('ativo', val);
+                                }}
+                                trackColor={{ true: colors.tint, false: (colorScheme === 'dark' ? '#374151' : '#e5e7eb') }}
+                                thumbColor={undefined}
+                                ios_backgroundColor={colorScheme === 'dark' ? '#374151' : '#e5e7eb'}
+                                disabled={isSubmitting}
+                            />
+                        </View>
+                        {touched.ativo && errors.ativo && <Text style={styles.errorText}>{errors.ativo}</Text>}
+                        </>)}
 
                         <View style={styles.actions}>
                             <TouchableOpacity
@@ -106,4 +160,5 @@ const styles = StyleSheet.create({
     primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
     ghostButton: { height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
     ghostButtonText: { fontWeight: '700', color: '#374151' },
+    switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
 });
